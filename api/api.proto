@@ -1,16 +1,16 @@
 syntax = "proto3";
 
-package utility;
+package preview;
 
-option go_package = "github.com/Vilinvil/thumbnail_utility";
+option go_package = "github.com/Vilinvil/preview";
 
 service ThumbnailService {
   rpc DownloadThumbnail (ThumbnailRequest) returns (ThumbnailResponse) {}
 }
 
 message ThumbnailRequest {
-  string url = 1;
-  optional bool asynchronous = 2;
+  bool asynchronous = 1;
+  string url = 2;
 }
 
 message ThumbnailResponse {
