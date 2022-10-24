@@ -14,7 +14,10 @@ import (
 
 var addr = "localhost:50051"
 
-var filePaths = "./test_file_jpg/file%v.jpg"
+var (
+	dirPath   = "./test_file_jpg"
+	filePaths = "/file%v.jpg"
+)
 
 func isModeAsync(args []string) bool {
 	if len(args) == 0 {
@@ -56,7 +59,11 @@ func main() {
 		log.Fatalf("In main *preview.ThumbnailResponse == nil")
 	}
 	for index, img := range resp.Img {
-		path := fmt.Sprintf(filePaths, index)
+		err = os.Mkdir(dirPath, 0777)
+		if err != nil {
+			log.Fatalf("In main could not Mkdir %s: %v", dirPath, err)
+		}
+		path := fmt.Sprintf(dirPath+filePaths, index)
 		out, err := os.Create(path)
 		if err != nil {
 			log.Fatalf("In main could not Create %s: %v", path, err)

@@ -31,7 +31,7 @@ var port = 50051
 
 var urlYoutubeApi = "https://i1.ytimg.com/vi/%s/maxresdefault.jpg"
 
-var dbPath = "../caching_db/preview.db"
+var dbPath = "caching_db/preview.db"
 
 var db = &DB{}
 
