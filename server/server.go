@@ -29,9 +29,13 @@ var maxOldEl = time.Hour
 
 var port = 50051
 
+var urlYoutubeApi = "https://i1.ytimg.com/vi/%s/maxresdefault.jpg"
+
 var dbPath = "../caching_db/preview.db"
 
-var urlYoutubeApi = "https://i1.ytimg.com/vi/%s/maxresdefault.jpg"
+var db = &DB{}
+
+var globChJobs = make(chan job)
 
 const (
 	insertSQL = `
@@ -61,12 +65,20 @@ file BLOB NOT NULL
  WHERE startTime <= ?`
 )
 
-var db = &DB{}
-
-type ElDB struct {
+type PreviewTableModel struct {
 	URL  string
 	Time time.Time
 	File []byte
+}
+
+type job struct {
+	url string
+	out chan jobResult
+}
+
+type jobResult struct {
+	file []byte
+	err  error
 }
 
 type DB struct {
@@ -97,7 +109,7 @@ func NewDB(dbFile string) (*DB, error) {
 	return &db, nil
 }
 
-func (db *DB) Add(elDB *ElDB) error {
+func (db *DB) Add(elDB *PreviewTableModel) error {
 	_, err := db.sql.Exec(insertSQL, elDB.URL, elDB.Time, elDB.File)
 	if err != nil {
 		return fmt.Errorf("in Add can`t Exec(): %w", err)
@@ -120,8 +132,8 @@ func (db *DB) Close() error {
 	return nil
 }
 
-func (db *DB) Select(url string) (*ElDB, error) {
-	resElDb := &ElDB{}
+func (db *DB) Select(url string) (*PreviewTableModel, error) {
+	resElDb := &PreviewTableModel{}
 	row := db.sql.QueryRow(selectUrlSQL, url)
 
 	err := row.Scan(&resElDb.URL, &resElDb.Time, &resElDb.File)
@@ -164,7 +176,7 @@ type server struct {
 	pr.UnimplementedThumbnailServiceServer
 }
 
-func (s *server) singleHandler(ctx context.Context, URL string) ([]byte, error) {
+func singleHandler(ctx context.Context, URL string) ([]byte, error) {
 	var resImg []byte
 	elDb, err := db.Select(URL)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -205,7 +217,7 @@ func (s *server) singleHandler(ctx context.Context, URL string) ([]byte, error) 
 
 		resImg = buf.Bytes()
 
-		err = db.Add(&ElDB{URL: URL, Time: time.Now(), File: resImg})
+		err = db.Add(&PreviewTableModel{URL: URL, Time: time.Now(), File: resImg})
 		if err != nil {
 			return nil, fmt.Errorf("in singleHandler can`t db.Add: %w", err)
 		}
@@ -219,55 +231,54 @@ func (s *server) singleHandler(ctx context.Context, URL string) ([]byte, error) 
 	return resImg, nil
 }
 
-func (s *server) worker(ctx context.Context, in chan string, out chan []byte) {
-	for URL := range in {
-		resImg, err := s.singleHandler(ctx, URL)
+func worker(ctx context.Context) {
+	for curJob := range globChJobs {
+		resImg, err := singleHandler(ctx, curJob.url)
 		if err != nil {
 			log.Printf("in worker [%d] error: %v", ctx.Value("idWorker"), err)
 		}
 
-		out <- resImg
-		fmt.Println("worker out")
-
+		curJob.out <- jobResult{file: resImg, err: err}
 	}
 }
 
 func (s *server) asynchronousHandler(ctx context.Context, UrlSl []string) ([][]byte, error) {
 	resSl := make([][]byte, 0, len(UrlSl))
-	resImg := make([]byte, 0)
+	jobRes := jobResult{file: make([]byte, 0)}
 
 	if len(UrlSl) == 0 {
 		return nil, errEmptyUrlSl
 	}
 
 	wg := &sync.WaitGroup{}
-	in := make(chan string)
-	out := make(chan []byte)
-	for i := 1; i <= 10; i++ {
-		ctxWorker := context.WithValue(ctx, "idWorker", i)
-		go s.worker(ctxWorker, in, out)
-	}
 	wg.Add(len(UrlSl))
+	out := make(chan jobResult)
 	go func() {
 		for _, URL := range UrlSl {
-			in <- URL
-			fmt.Println("go in")
+			curJob := job{url: URL, out: out}
+			globChJobs <- curJob
 		}
 	}()
 
 	go func() {
 		for {
 			select {
-			case resImg = <-out:
-				fmt.Println("select out")
-				resSl = append(resSl, resImg)
-				wg.Done()
-			}
+			case jobRes = <-out:
+				if jobRes.err != nil {
+					log.Printf("")
+					break
+				}
+				resSl = append(resSl, jobRes.file)
 
+			}
+			wg.Done()
 		}
 	}()
 
 	wg.Wait()
+	if len(UrlSl) > len(resSl) {
+		return nil, fmt.Errorf("len(UrlSl) > len(resSl)")
+	}
 
 	return resSl, nil
 }
@@ -280,7 +291,7 @@ func (s *server) sequentialHandler(ctx context.Context, UrlSl []string) ([][]byt
 	}
 
 	for _, URL := range UrlSl {
-		resImg, err := s.singleHandler(ctx, URL)
+		resImg, err := singleHandler(ctx, URL)
 		if err != nil {
 			return nil, fmt.Errorf("in sequentialHandler can`t s.singleHandler(ctx, URL): %w", err)
 		}
@@ -304,7 +315,7 @@ func (s *server) DownloadThumbnail(ctx context.Context, in *pr.ThumbnailRequest)
 	}
 
 	if err != nil {
-		log.Printf("in DownloadThumbnail error is: %w", err)
+		log.Printf("in DownloadThumbnail error is: %v", err)
 		switch {
 		case errors.Is(err, errPreviewNotFound):
 			return nil, errPreviewNotFound
@@ -351,8 +362,15 @@ func main() {
 	}()
 
 	s := grpc.NewServer()
+
 	pr.RegisterThumbnailServiceServer(s, &server{})
 	log.Printf("In main server listening at %v", lis.Addr())
+
+	for i := 0; i < 10; i++ {
+		ctxWorker := context.WithValue(context.Background(), "idWorker", i)
+		go worker(ctxWorker)
+	}
+
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("In main failed to serve: %v", err)
 	}
