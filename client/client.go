@@ -40,13 +40,14 @@ func main() {
 	defer cancel()
 
 	var UrlSl []string
-	if asyncMode := isModeAsync(os.Args[1:]); asyncMode {
+	asyncMode := isModeAsync(os.Args[1:])
+	if asyncMode {
 		UrlSl = os.Args[2:]
 	} else {
 		UrlSl = os.Args[1:]
 	}
 
-	resp, err := c.DownloadThumbnail(ctx, &pr.ThumbnailRequest{Url: UrlSl, Asynchronous: isModeAsync(os.Args[1:])})
+	resp, err := c.DownloadThumbnail(ctx, &pr.ThumbnailRequest{Url: UrlSl, Asynchronous: asyncMode})
 	if err != nil {
 		log.Fatalf("In main could not DownloadThumbnail: %v", err)
 	}

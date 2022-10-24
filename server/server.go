@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync"
 	pr "thumbnail_utility/api"
 	"time"
 
@@ -259,10 +260,58 @@ func (s *server) singleHandler(ctx context.Context, URL string) ([]byte, error) 
 	return resImg, nil
 }
 
+func (s *server) worker(ctx context.Context, in chan string, out chan []byte) {
+	for URL := range in {
+		resImg, err := s.singleHandler(ctx, URL)
+		if err != nil {
+			log.Printf("in worker [%d] error: %v", ctx.Value("idWorker"), err)
+		}
+
+		out <- resImg
+		fmt.Println("worker out")
+
+	}
+}
+
 func (s *server) asynchronousHandler(ctx context.Context, UrlSl []string) ([][]byte, error) {
 	log.Println("in asynchronousHandler")
+	resSl := make([][]byte, 0, len(UrlSl))
+	resImg := make([]byte, 0)
 
-	return nil, nil
+	if len(UrlSl) == 0 {
+		return nil, errEmptyUrlSl
+	}
+
+	wg := &sync.WaitGroup{}
+	in := make(chan string)
+	out := make(chan []byte)
+	for i := 1; i <= 10; i++ {
+		ctxWorker := context.WithValue(ctx, "idWorker", i)
+		go s.worker(ctxWorker, in, out)
+	}
+	wg.Add(len(UrlSl))
+	go func() {
+		for _, URL := range UrlSl {
+			in <- URL
+			fmt.Println("go in")
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case resImg = <-out:
+				fmt.Println("select out")
+				resSl = append(resSl, resImg)
+				wg.Done()
+			}
+
+		}
+	}()
+
+	wg.Wait()
+
+	return resSl, nil
 }
 
 func (s *server) sequentialHandler(ctx context.Context, UrlSl []string) ([][]byte, error) {
@@ -293,6 +342,10 @@ func (s *server) DownloadThumbnail(ctx context.Context, in *pr.ThumbnailRequest)
 	var err error
 	resSl := make([][]byte, 0, len(in.Url))
 	if in.Asynchronous {
+		resSl, err = s.asynchronousHandler(ctx, in.Url)
+		if err != nil {
+			return nil, fmt.Errorf("in DownloadThumbnail: %w", err)
+		}
 	} else {
 		resSl, err = s.sequentialHandler(ctx, in.Url)
 	}
