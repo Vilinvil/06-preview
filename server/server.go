@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"google.golang.org/grpc"
 	"io"
 	"log"
 	"net"
@@ -18,11 +17,13 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
+	"google.golang.org/grpc"
 )
 
 var (
-	errPreviewNotFound = errors.New("preview not found")
+	errPreviewNotFound = errors.New("some preview not found")
 	errEmptyUrlSl      = errors.New("UrlSL is empty slice")
+	errUnknown         = errors.New("unknown error on server")
 )
 var maxOldEl = time.Hour
 
@@ -343,14 +344,20 @@ func (s *server) DownloadThumbnail(ctx context.Context, in *pr.ThumbnailRequest)
 	resSl := make([][]byte, 0, len(in.Url))
 	if in.Asynchronous {
 		resSl, err = s.asynchronousHandler(ctx, in.Url)
-		if err != nil {
-			return nil, fmt.Errorf("in DownloadThumbnail: %w", err)
-		}
 	} else {
 		resSl, err = s.sequentialHandler(ctx, in.Url)
 	}
+
 	if err != nil {
-		return nil, fmt.Errorf("in DownloadThumbnail: %w", err)
+		log.Printf("in DownloadThumbnail error is: %w", err)
+		switch {
+		case errors.Is(err, errPreviewNotFound):
+			return nil, errPreviewNotFound
+		case errors.Is(err, errEmptyUrlSl):
+			return nil, errEmptyUrlSl
+		default:
+			return nil, errUnknown
+		}
 	}
 
 	return &pr.ThumbnailResponse{Img: resSl}, nil
@@ -376,7 +383,8 @@ func main() {
 		log.Fatalf("In main fail NewDB() %s: %v", dbPath, err)
 	}
 
-	go db.Clearing(20 * time.Second)
+	// Каждые 10 мин проверяю, не лежит ли более одного часа ссылка с файлом в базе
+	go db.Clearing(10 * time.Minute)
 
 	defer func() {
 		err = db.Close()
