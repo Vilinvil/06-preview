@@ -10,9 +10,9 @@ service ThumbnailService {
 
 message ThumbnailRequest {
   bool asynchronous = 1;
-  string url = 2;
+  repeated string url = 2;
 }
 
 message ThumbnailResponse {
-  bytes img = 1;
+  repeated bytes img = 1;
 }
