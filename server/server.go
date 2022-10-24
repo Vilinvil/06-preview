@@ -98,7 +98,6 @@ func NewDB(dbFile string) (*DB, error) {
 }
 
 func (db *DB) Add(elDB *ElDB) error {
-	log.Println("in ADD")
 	tx, err := db.sql.Begin()
 	if err != nil {
 		return fmt.Errorf("in Add can`t begin transaction: %w", err)
@@ -136,7 +135,6 @@ func (db *DB) Close() error {
 }
 
 func (db *DB) Select(url string) (*ElDB, error) {
-	log.Println("in select")
 	resElDb := &ElDB{}
 	row := db.sql.QueryRow(selectUrlSQL, url)
 
@@ -275,7 +273,6 @@ func (s *server) worker(ctx context.Context, in chan string, out chan []byte) {
 }
 
 func (s *server) asynchronousHandler(ctx context.Context, UrlSl []string) ([][]byte, error) {
-	log.Println("in asynchronousHandler")
 	resSl := make([][]byte, 0, len(UrlSl))
 	resImg := make([]byte, 0)
 
@@ -316,7 +313,6 @@ func (s *server) asynchronousHandler(ctx context.Context, UrlSl []string) ([][]b
 }
 
 func (s *server) sequentialHandler(ctx context.Context, UrlSl []string) ([][]byte, error) {
-	log.Println("in sequentialHandler")
 	resSl := make([][]byte, 0, len(UrlSl))
 
 	if len(UrlSl) == 0 {
@@ -335,7 +331,6 @@ func (s *server) sequentialHandler(ctx context.Context, UrlSl []string) ([][]byt
 }
 
 func (s *server) DownloadThumbnail(ctx context.Context, in *pr.ThumbnailRequest) (*pr.ThumbnailResponse, error) {
-	log.Println("in DownloadThumbnail")
 	if in == nil {
 		return nil, fmt.Errorf("in DownloadThumbnail *pr.ThumbnailRequest == nil")
 	}
@@ -360,6 +355,7 @@ func (s *server) DownloadThumbnail(ctx context.Context, in *pr.ThumbnailRequest)
 		}
 	}
 
+	log.Printf("in DownloadThumbnail successfully handle request")
 	return &pr.ThumbnailResponse{Img: resSl}, nil
 }
 
