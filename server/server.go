@@ -87,7 +87,6 @@ type DB struct {
 }
 
 func NewDB(dbFile string) (*DB, error) {
-	log.Println("in NewDB")
 	sqlDB, err := sql.Open("sqlite3", dbFile)
 	if err != nil {
 		return nil, fmt.Errorf("in NewDB can`t open file %s: %w", dbFile, err)
@@ -166,6 +165,9 @@ func getVideoIdFromUrl(URL string) (string, error) {
 	videoId := inUrl.Query().Get("v")
 	if videoId == "" {
 		// В старых видео Id лежит не в параметрах, а просто в пути
+		if len(inUrl.Path) == 0 {
+			return "", fmt.Errorf("in getVideoIdFromUrl len(inUrl.Path) == 0")
+		}
 		videoId = inUrl.Path[1:]
 	}
 
@@ -204,7 +206,7 @@ func singleHandler(ctx context.Context, URL string) ([]byte, error) {
 
 		if resp.StatusCode != http.StatusOK {
 			if resp.StatusCode == http.StatusNotFound {
-				return nil, errPreviewNotFound
+				return nil, fmt.Errorf("in singleHandler url = %v: %w", fmt.Sprintf(urlYoutubeApi, videoId), errPreviewNotFound)
 			}
 			return nil, fmt.Errorf("in singleHandler http.Get() give unknown error")
 		}
@@ -247,7 +249,8 @@ func (s *server) asynchronousHandler(ctx context.Context, UrlSl []string) ([][]b
 	jobRes := jobResult{file: make([]byte, 0)}
 
 	if len(UrlSl) == 0 {
-		return nil, errEmptyUrlSl
+		return nil, fmt.Errorf("in asynchronousHandler: %w", errEmptyUrlSl)
+
 	}
 
 	wg := &sync.WaitGroup{}
@@ -265,7 +268,7 @@ func (s *server) asynchronousHandler(ctx context.Context, UrlSl []string) ([][]b
 			select {
 			case jobRes = <-out:
 				if jobRes.err != nil {
-					log.Printf("")
+					log.Printf("in asynchronousHandler in gorutine: %v", jobRes.err)
 					break
 				}
 				resSl = append(resSl, jobRes.file)
@@ -287,7 +290,7 @@ func (s *server) sequentialHandler(ctx context.Context, UrlSl []string) ([][]byt
 	resSl := make([][]byte, 0, len(UrlSl))
 
 	if len(UrlSl) == 0 {
-		return nil, errEmptyUrlSl
+		return nil, fmt.Errorf("in sequentialHandler: %w", errEmptyUrlSl)
 	}
 
 	for _, URL := range UrlSl {
