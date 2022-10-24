@@ -62,7 +62,7 @@ file BLOB NOT NULL
 var db = &DB{}
 
 type ElDB struct {
-	Url  string
+	URL  string
 	Time time.Time
 	File []byte
 }
@@ -102,7 +102,7 @@ func (db *DB) Add(elDB *ElDB) error {
 		return fmt.Errorf("in Add can`t begin transaction: %w", err)
 	}
 
-	_, err = tx.Stmt(db.stmt).Exec(elDB.Url, elDB.Time, elDB.File)
+	_, err = tx.Stmt(db.stmt).Exec(elDB.URL, elDB.Time, elDB.File)
 	if err != nil {
 		errIn := tx.Rollback()
 		if errIn != nil {
@@ -138,7 +138,7 @@ func (db *DB) Select(url string) (*ElDB, error) {
 	resElDb := &ElDB{}
 	row := db.sql.QueryRow(selectUrlSQL, url)
 
-	err := row.Scan(&resElDb.Url, &resElDb.Time, &resElDb.File)
+	err := row.Scan(&resElDb.URL, &resElDb.Time, &resElDb.File)
 	if err != nil {
 		return nil, fmt.Errorf("in Select can`t row.Scan(): %w", err)
 	}
@@ -204,7 +204,68 @@ type server struct {
 	pr.UnimplementedThumbnailServiceServer
 }
 
-func (c *server) sequentialHandler(ctx context.Context, UrlSl []string) ([][]byte, error) {
+func (s *server) singleHandler(ctx context.Context, URL string) ([]byte, error) {
+	var resImg []byte
+	elDb, err := db.Select(URL)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("in singleHandler can`t db.Select(): %w", err)
+	}
+	if elDb != nil {
+		if elDb.File == nil {
+			return nil, fmt.Errorf("in singleHandler elDb.File == nil")
+		}
+		if len(elDb.File) == 0 {
+			return nil, fmt.Errorf("in singleHandler elDb.File is empty")
+		}
+
+		resImg = elDb.File
+	} else {
+		videoId, err := getVideoIdFromUrl(URL)
+		if err != nil {
+			return nil, fmt.Errorf("in singleHandler: %w", err)
+		}
+
+		resp, err := http.Get(fmt.Sprintf(urlYoutubeApi, videoId))
+		if err != nil {
+			return nil, fmt.Errorf("in singleHandler can`t http.Get(): %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			if resp.StatusCode == http.StatusNotFound {
+				return nil, errPreviewNotFound
+			}
+			return nil, fmt.Errorf("in singleHandler http.Get() give unknown error")
+		}
+
+		buf := &bytes.Buffer{}
+		_, err = io.Copy(buf, resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("in singleHandler can`t Copy resp.Body to buf: %w", err)
+		}
+
+		resImg = buf.Bytes()
+
+		err = db.Add(&ElDB{URL: URL, Time: time.Now(), File: resImg})
+		if err != nil {
+			return nil, fmt.Errorf("in singleHandler can`t db.Add: %w", err)
+		}
+
+		err = resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("in singleHandler can`t close resp.body: %w", err)
+		}
+	}
+
+	return resImg, nil
+}
+
+func (s *server) asynchronousHandler(ctx context.Context, UrlSl []string) ([][]byte, error) {
+	log.Println("in asynchronousHandler")
+
+	return nil, nil
+}
+
+func (s *server) sequentialHandler(ctx context.Context, UrlSl []string) ([][]byte, error) {
 	log.Println("in sequentialHandler")
 	resSl := make([][]byte, 0, len(UrlSl))
 
@@ -213,60 +274,17 @@ func (c *server) sequentialHandler(ctx context.Context, UrlSl []string) ([][]byt
 	}
 
 	for _, URL := range UrlSl {
-		elDb, err := db.Select(URL)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("in sequentialHandler can`t db.Select(): %w", err)
+		resImg, err := s.singleHandler(ctx, URL)
+		if err != nil {
+			return nil, fmt.Errorf("in sequentialHandler can`t s.singleHandler(ctx, URL): %w", err)
 		}
-		if elDb != nil {
-			if elDb.File == nil {
-				return nil, fmt.Errorf("in sequentialHandler elDb.File == nil")
-			}
-			if len(elDb.File) == 0 {
-				return nil, fmt.Errorf("in sequentialHandler elDb.File is empty")
-			}
-			resSl = append(resSl, elDb.File)
-		} else {
-			videoId, err := getVideoIdFromUrl(URL)
-			if err != nil {
-				return nil, fmt.Errorf("in sequentialHandler: %w", err)
-			}
-
-			resp, err := http.Get(fmt.Sprintf(urlYoutubeApi, videoId))
-			if err != nil {
-				return nil, fmt.Errorf("in sequentialHandler can`t http.Get(): %w", err)
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				if resp.StatusCode == http.StatusNotFound {
-					return nil, errPreviewNotFound
-				}
-				return nil, fmt.Errorf("in sequentialHandler http.Get() give unknown error")
-			}
-
-			buf := &bytes.Buffer{}
-			_, err = io.Copy(buf, resp.Body)
-			if err != nil {
-				return nil, fmt.Errorf("in sequentialHandler can`t Copy resp.Body to buf: %w", err)
-			}
-
-			resSl = append(resSl, buf.Bytes())
-
-			err = db.Add(&ElDB{Url: URL, Time: time.Now(), File: buf.Bytes()})
-			if err != nil {
-				return nil, fmt.Errorf("in sequentialHandler can`t db.Add: %w", err)
-			}
-
-			err = resp.Body.Close()
-			if err != nil {
-				return nil, fmt.Errorf("in sequentialHandler can`t close resp.body: %w", err)
-			}
-		}
+		resSl = append(resSl, resImg)
 	}
 
 	return resSl, nil
 }
 
-func (c *server) DownloadThumbnail(ctx context.Context, in *pr.ThumbnailRequest) (*pr.ThumbnailResponse, error) {
+func (s *server) DownloadThumbnail(ctx context.Context, in *pr.ThumbnailRequest) (*pr.ThumbnailResponse, error) {
 	log.Println("in DownloadThumbnail")
 	if in == nil {
 		return nil, fmt.Errorf("in DownloadThumbnail *pr.ThumbnailRequest == nil")
@@ -276,7 +294,7 @@ func (c *server) DownloadThumbnail(ctx context.Context, in *pr.ThumbnailRequest)
 	resSl := make([][]byte, 0, len(in.Url))
 	if in.Asynchronous {
 	} else {
-		resSl, err = c.sequentialHandler(ctx, in.Url)
+		resSl, err = s.sequentialHandler(ctx, in.Url)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("in DownloadThumbnail: %w", err)
