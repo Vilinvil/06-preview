@@ -36,7 +36,7 @@ func main() {
 	}()
 	c := pr.NewThumbnailServiceClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
 	var UrlSl []string

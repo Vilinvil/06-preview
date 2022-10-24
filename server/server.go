@@ -98,23 +98,9 @@ func NewDB(dbFile string) (*DB, error) {
 }
 
 func (db *DB) Add(elDB *ElDB) error {
-	tx, err := db.sql.Begin()
+	_, err := db.sql.Exec(insertSQL, elDB.URL, elDB.Time, elDB.File)
 	if err != nil {
-		return fmt.Errorf("in Add can`t begin transaction: %w", err)
-	}
-
-	_, err = tx.Stmt(db.stmt).Exec(elDB.URL, elDB.Time, elDB.File)
-	if err != nil {
-		errIn := tx.Rollback()
-		if errIn != nil {
-			return fmt.Errorf("in Add can`t tx.Rollback(): %w", err)
-		}
-		return fmt.Errorf("in Add can`t Exec(): %+v", err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("in Add can`t tx.Commit(): %w", err)
+		return fmt.Errorf("in Add can`t Exec(): %w", err)
 	}
 
 	return nil
@@ -151,36 +137,10 @@ func (db *DB) Clearing(period time.Duration) {
 	for {
 		select {
 		case <-tic.C:
-			stmt, err := db.sql.Prepare(deleteElSQL)
+			_, err := db.sql.Exec(deleteElSQL, time.Now().Add(-1*maxOldEl))
 			if err != nil {
-				log.Printf("In Clearing can`t db.sql.Prepare(deleteElSQL): %v", err)
+				log.Printf("in Add can`t Exec(): %v", err)
 			}
-			db.stmt = stmt
-			tx, err := db.sql.Begin()
-			if err != nil {
-				log.Printf("In Clearing can`t db.sql.Begin(): %v", err)
-			}
-
-			_, err = tx.Stmt(db.stmt).Exec(time.Now().Add(-1 * maxOldEl))
-			if err != nil {
-				errIn := tx.Rollback()
-				if errIn != nil {
-					log.Printf("In Clearing can`t tx.Rollback(): %v", err)
-				}
-				log.Printf("In Clearing can`t tx.Stmt(db.stmt).Exec(): %v", err)
-			}
-
-			err = tx.Commit()
-			if err != nil {
-				log.Printf("In Clearing can`t tx.Commit(): %v", err)
-			}
-
-			stmt, err = db.sql.Prepare(insertSQL)
-			if err != nil {
-				log.Printf("In Clearing can`t db.sql.Prepare(insertSQL): %v", err)
-			}
-			db.stmt = stmt
-
 		}
 	}
 }
