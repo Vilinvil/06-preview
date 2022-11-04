@@ -66,6 +66,8 @@ CREATE INDEX IF NOT EXISTS trades_time ON previews(created_at);`
  WHERE created_at <= ?`
 )
 
+const countOfWorkers = 10
+
 type PreviewTableModel struct {
 	URL  string
 	Time time.Time
@@ -375,7 +377,7 @@ func main() {
 	pr.RegisterThumbnailServiceServer(s, &server{})
 	log.Printf("In main server listening at %v", lis.Addr())
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < countOfWorkers; i++ {
 		ctxWorker := context.WithValue(context.Background(), "idWorker", i)
 		go worker(ctxWorker)
 	}
