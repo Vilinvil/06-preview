@@ -40,7 +40,7 @@ var globChJobs = make(chan job)
 const (
 	insertSQL = `
 INSERT INTO previews (
-	url, startTime, file
+	url, created_at, file
 ) VALUES (
 	?, ?, ?
 )
@@ -51,18 +51,19 @@ CREATE TABLE IF NOT EXISTS previews (
 
 url TEXT PRIMARY KEY NOT NULL,
 
-startTime TIMESTAMP,
+created_at TIMESTAMP,
 
 file BLOB NOT NULL
 
-)`
+);
+CREATE INDEX IF NOT EXISTS trades_time ON previews(created_at);`
 
 	selectUrlSQL = `SELECT * FROM previews
     WHERE url == ?`
 
 	deleteElSQL = `
 	 DELETE FROM previews
- WHERE startTime <= ?`
+ WHERE created_at <= ?`
 )
 
 type PreviewTableModel struct {
