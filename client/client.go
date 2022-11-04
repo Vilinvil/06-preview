@@ -71,7 +71,7 @@ func main() {
 	}
 	for index, img := range resp.Img {
 		err = os.Mkdir(dirPath, 0777)
-		if err != nil {
+		if err != nil && !os.IsExist(err) {
 			log.Fatalf("In main could not Mkdir %s: %v", dirPath, err)
 		}
 		path := fmt.Sprintf(dirPath+filePaths, index)
