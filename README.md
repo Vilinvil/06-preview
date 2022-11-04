@@ -7,12 +7,14 @@
 
   bin/client_preview (посылает соответствующий аргументам командной строки запрос на сервер)
   
-  В утилите bin/client_preview [--async] https://... 
-ключ --async опциональный, при его наличии адреса будут обрабатываться асинхронно и после ключа следуют urls, разделенные пробелами вида:
+  В утилите bin/client_preview [--async] 'https://...' 
+Ключ --async опциональный, при его наличии адреса будут обрабатываться асинхронно и после ключа следуют urls внутри одинарных кавычек, разделенные пробелами вида:
 https://www.youtube.com/watch?v=VideoId... или https://www.youtube.com/VideoId... 
+Можно использовать и без кавычек, но тогда в терминале нужно экранировать специальные символы
   
-   Пример команды утилиты: bin/client_preview --async  https://www.youtube.com/watch?v=7g01DlHlQqI https://www.youtube.com/watch?v=7g01DlHlQqI&list=PL4_hYwCyhAvYyx4TIRk6tLG0c8CLGzhE5&index=1&ab_channel=%D0%9B%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B8%D0%B9%D0%A4%D0%9F%D0%9C%D0%98
-  
+  Примеры команды утилиты:
+bin/client_preview 'https://www.youtube.com/watch?v=jfKfPfyJRdk&ab_channel=LofiGirl https://www.youtube.com/watch?v=mesl2Si6saw https://www.youtube.com/watch?v=7g01DlHlQqI&ab_channel=%D0%9B%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B8%D0%B9%D0%A4%D0%9F%D0%9C%D0%98'
+
 * Возможно потребуется поставить sqlite3, к примеру на Ubuntu введите две команды 
 
     sudo apt update

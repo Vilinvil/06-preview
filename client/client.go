@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	pr "thumbnail_utility/api"
 	"time"
 
@@ -24,6 +25,15 @@ func isModeAsync(args []string) bool {
 		return false
 	}
 	return args[0] == "--async"
+}
+
+func splitStr(sl []string) []string {
+	var res []string
+	for _, val := range sl {
+		res = append(res, strings.Fields(val)...)
+	}
+
+	return res
 }
 
 func main() {
@@ -49,6 +59,7 @@ func main() {
 	} else {
 		UrlSl = os.Args[1:]
 	}
+	UrlSl = splitStr(UrlSl)
 
 	resp, err := c.DownloadThumbnail(ctx, &pr.ThumbnailRequest{Url: UrlSl, Asynchronous: asyncMode})
 	if err != nil {
