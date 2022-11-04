@@ -310,12 +310,17 @@ func (s *server) DownloadThumbnail(ctx context.Context, in *pr.ThumbnailRequest)
 		return nil, fmt.Errorf("in DownloadThumbnail *pr.ThumbnailRequest == nil")
 	}
 
+	Url := in.GetUrl()
+	if Url == nil {
+		return nil, fmt.Errorf("in DownloadThumbnail *pr.ThumbnailRequest.Url == nil")
+	}
+
 	var err error
 	resSl := make([][]byte, 0, len(in.Url))
-	if in.Asynchronous {
-		resSl, err = s.asynchronousHandler(ctx, in.Url)
+	if in.GetAsynchronous() {
+		resSl, err = s.asynchronousHandler(ctx, Url)
 	} else {
-		resSl, err = s.sequentialHandler(ctx, in.Url)
+		resSl, err = s.sequentialHandler(ctx, Url)
 	}
 
 	if err != nil {
