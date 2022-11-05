@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package service;
+
+option go_package = "pkg/service";
+
+service ThumbnailService {
+  rpc DownloadThumbnail (ThumbnailRequest) returns (ThumbnailResponse) {}
+}
+
+message ThumbnailRequest {
+  bool asynchronous = 1;
+  repeated string url = 2;
+}
+
+message ThumbnailResponse {
+  repeated bytes img = 1;
+}
