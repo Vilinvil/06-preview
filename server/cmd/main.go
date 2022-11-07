@@ -13,7 +13,7 @@ const port = 50051
 
 const countOfWorkers = 10
 
-var dbPath = "../server/internal/storage/sqlite/cashing_db/thumbnail.db"
+var dbPath = "server/internal/storage/sqlite/cashing_db/thumbnail.db"
 
 func main() {
 	chJobs := make(chan app.Job)

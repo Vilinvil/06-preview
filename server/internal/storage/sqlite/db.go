@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -53,7 +52,6 @@ type DB struct {
 }
 
 func NewDB(dbFile string) (*DB, error) {
-	fmt.Println(os.Args[0])
 	sqlDB, err := sql.Open("sqlite3", dbFile)
 	if err != nil {
 		return nil, fmt.Errorf("in NewDB can`t open file %s: %w", dbFile, err)

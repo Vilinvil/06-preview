@@ -1,6 +1,8 @@
-* Для сборки проекта используйте  (находясь в /thumbnail_utility)
-  go build -o bin/server_preview server/server.go
-  go build -o bin/client_preview client/client.go
+* Для сборки проекта используйте
+  (находясь в /thumbnail_utility/server)
+  go build -o ../bin/server_preview cmd/main.go
+  (находясь в /thumbnail_utility/client)
+  go build -o ../bin/client_preview cmd/main.go
 
 * Запустите в отдельных вкладках терминала (находясь в /thumbnail_utility)
   bin/server_preview (запускает сервер на локальном хосте)
@@ -14,6 +16,8 @@ https://www.youtube.com/watch?v=VideoId... или https://www.youtube.com/VideoI
   
   Примеры команды утилиты:
 bin/client_preview 'https://www.youtube.com/watch?v=jfKfPfyJRdk&ab_channel=LofiGirl https://www.youtube.com/watch?v=mesl2Si6saw https://www.youtube.com/watch?v=7g01DlHlQqI&ab_channel=%D0%9B%D0%B5%D0%BA%D1%82%D0%BE%D1%80%D0%B8%D0%B9%D0%A4%D0%9F%D0%9C%D0%98'
+
+ В "го модах" использую replace, чтобы не ходить за зависимостями по сети, а подтягивался локальный пакет.
 
 * Возможно потребуется поставить sqlite3, к примеру на Ubuntu введите две команды 
 
